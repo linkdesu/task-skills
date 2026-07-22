@@ -126,6 +126,19 @@ rel RMSE ≈ 0.034–0.038, cosine ≈ 0.9993 across shapes
 The wheel produced during the build can be recovered from uv's cache if needed:
 `find ~/AppData/Local/uv/cache -name "sageattention*.whl"`.
 
+**Important:** After confirming the build succeeded, copy the wheel to your current
+working directory for easy transfer to other machines or environments:
+
+```bash
+cp $(find ~/AppData/Local/uv/cache -name "sageattention*.whl" | head -1) .
+```
+
+You can then install it elsewhere with:
+
+```bash
+uv pip install sageattention-2.2.0-cp312-cp312-win_amd64.whl
+```
+
 ## Pitfall reference (symptom → root cause → fix)
 
 ### 1. `rocm-sdk.exe` fails with "uv trampoline failed to canonicalize script path"
