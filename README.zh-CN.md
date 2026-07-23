@@ -31,6 +31,7 @@ npx skills add https://github.com/<owner>/<repo>/tree/main/skills/<skill>
 ## Skill 索引
 
 - build-sageattention-rocm-on-win11: [skills/build-sageattention-rocm-on-win11/SKILL.md](skills/build-sageattention-rocm-on-win11/SKILL.md)
+- dashboard-https-proxy: [skills/hermes/dashboard-https-proxy/SKILL.md](skills/hermes/dashboard-https-proxy/SKILL.md)
 
 ## 如何贡献新 skill
 
