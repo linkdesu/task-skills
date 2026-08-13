@@ -31,8 +31,9 @@ multi-GPU offload, and the full black-screen/NaN debugging journey.
 3. **Multi-GPU**: put the 32B text encoder on the second GPU via
    `CLIPLoaderMultiGPU` + `device="cuda:1"`; UNet stays on GPU0. Verified
    ~20.7 GB GPU0 + ~14.7 GB GPU1 with headroom for 1080p sampling (peak 27.6 GB).
-4. **BlockSwap (XB_Sage_BlockSwap) gave no benefit** with fp8 (same 55 s at SW=0 and
-   SW=25; SW=50 blew up system RAM). Keep it off.
+4. **BlockSwap (XB_Sage_BlockSwap) gave no benefit** (measured on convrot int8:
+   same 55 s at SW=0 and SW=25; SW=50 blew up system RAM). Keep it off — the
+   same conclusion applies to fp8 (no manual swap when the model fits).
 
 ## 1. Model selection: convrot vs fp8
 
@@ -272,7 +273,7 @@ overwritten by a PyPI CUDA build — reinstall the ROCm wheels (see pitfall #1).
 | `TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1` | NaN risk | **remove** |
 | `PYTORCH_HIP_ALLOC_CONF=expandable_segments:True` | NaN risk | **remove** |
 | `--use-pytorch-cross-attention` | NaN risk | **remove** |
-| XB_Sage_BlockSwap SW=25 | same 55 s, +8 GB RAM | skip (keep SW=0) |
+| XB_Sage_BlockSwap SW=25 | same 55 s (convrot int8), +8 GB RAM | skip (keep SW=0) |
 | XB_Sage_BlockSwap SW=50 | run1 168 s; run2 RAM thrash, timeout | never |
 
 > **RDNA3 note**: on 24 GB cards (7900 XTX), smaller swap values *did* help
@@ -294,9 +295,11 @@ api["130"]["class_type"] = "CLIPLoaderMultiGPU"
 api["130"]["inputs"]["device"] = "cuda:1"
 ```
 
-Or edit the workflow JSON node directly: `CLIPLoader` already exposes a `device`
-COMBO widget — replace its `class_type` with `CLIPLoaderMultiGPU` and set
-`device` to `cuda:1`. GPU0 = card 0, GPU1 = card 1; with
+Or edit the workflow JSON node directly: replace node 130's `class_type` with
+`CLIPLoaderMultiGPU` and set its `device` input to `cuda:1`. (The stock
+`CLIPLoader` device COMBO only offers `default`/`cpu` — the MultiGPU wrapper
+adds the physical device list, which on a 3-GPU box is `cuda:0/cuda:1/cuda:2`;
+pick `cuda:1`, never the iGPU `cuda:2`.) GPU0 = card 0, GPU1 = card 1; with
 `HIP_VISIBLE_DEVICES` set, the indices shift accordingly.
 
 ### Verify placement (don't trust it blindly)
@@ -348,8 +351,11 @@ restart look fine, failures appear after the model stays resident. This is why
 "restart then test twice" gives a false sense of stability.
 
 > With fp8 models the issue was not reproducible at all — another strong argument
-> for fp8 over convrot on ROCm RDNA4. Convrot's CPU-side rotation kernels and
-> ROCm's FP8 paths may differ numerically on other architectures; re-test.
+> for fp8 over convrot on ROCm RDNA4. Verified on the reference stack: fp8 UNet +
+> TE on cuda:1 ran **8 consecutive successful renders** across the 5 s / 10 s /
+> 15 s / 720p / 1080p matrix (§7, §7.2) with no black frame and no audio NaN.
+> Convrot's CPU-side rotation kernels and ROCm's FP8 paths may differ numerically
+> on other architectures; re-test.
 
 ### Debugging discipline that worked
 
@@ -415,6 +421,21 @@ the same core node set.
 - For comparison: a 7900 XTX (24 GB, RDNA3) took ~190–280 s for the same 480×864
   job on convrot — R9700's RDNA4 int8/fp8 kernels are significantly faster, but
   your mileage varies by architecture.
+
+### 7.2 Duration scaling (480×864, fp8, 24 fps, 4 steps, TE on cuda:1)
+
+| Duration | Frames | Gen time (run1/run2) | Audio | System RAM | GPU0/GPU1 |
+|---|---|---|---|---|---|
+| 5 s | 124 | **55 s** (hot; +~110 s first fp8 load) | −14.5 dB | 28 G | 25.8 / 14.7 G |
+| 10 s | 243 | **145–150 s** | −15.6/−14.0 dB | 29 G | 25.9 / 14.7 G |
+| 15 s | 362 | **270 s** | −14.2/−18.5 dB | 29 G | 25.9 / 14.7 G |
+
+Duration is set via the `XB_HailuoH3VideoParams` node (161) `duration` input
+(seconds; frames = `round(duration×24)` then aligned up to a `%17` boundary —
+5 s→124, 10 s→243, 15 s→362). Gen time scales roughly **linearly with frames**
+(~55 s per 124-frame block), while VRAM/RAM stay flat — 15 s at 480×864 leaves
+~30 GB RAM and ~6 GB GPU0 headroom, so frame count is the cheap axis to extend
+once the model is split across two GPUs.
 
 ## 8. Pitfall reference (symptom → cause → fix)
 
