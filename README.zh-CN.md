@@ -33,6 +33,7 @@ npx skills add https://github.com/<owner>/<repo>/tree/main/skills/<skill>
 - build-sageattention-rocm-on-win11: [skills/build-sageattention-rocm-on-win11/SKILL.md](skills/build-sageattention-rocm-on-win11/SKILL.md)
 - comfyui-minimax-h3-rocm-tuning: [skills/comfyui-minimax-h3-rocm-tuning/SKILL.md](skills/comfyui-minimax-h3-rocm-tuning/SKILL.md)
 - dashboard-https-proxy: [skills/hermes/dashboard-https-proxy/SKILL.md](skills/hermes/dashboard-https-proxy/SKILL.md)
+- vllm-r9700-rocm-tuning: [skills/vllm-r9700-rocm-tuning/SKILL.md](skills/vllm-r9700-rocm-tuning/SKILL.md)
 
 ## 如何贡献新 skill
 
